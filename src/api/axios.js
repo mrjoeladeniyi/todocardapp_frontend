@@ -2,7 +2,7 @@ import axios from 'axios';
 
 
 const axiosInstance = axios.create({
-  baseURL: process.env.API_BASE_URL || 'http://localhost:3000/',
+  baseURL: process.env.REACT_APP_API_BASE_URL || "https://todocardapp-b9d4015df0d8.herokuapp.com/",
   headers: {
     'Content-Type': 'application/json',
   },
