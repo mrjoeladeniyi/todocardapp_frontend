@@ -22,26 +22,18 @@ const TodoCard = ({ refreshTrigger = 0 }) => {
     useEffect(() => {
         const fetchTodos = async () => {
             try {
-                const token = localStorage.getItem('token');
-                
-                if (!token) {
-                    setError('No authentication token found. Please login.');
-                    setLoading(false);
-                    return;
-                }
-
+                setLoading(true);
                 const response = await axiosInstance.get('/todos');
-                setTodos(response.data);
-                
-                // Initialize timers for each todo
-                const initialTimers = {};
-                response.data.forEach(todo => {
-                    initialTimers[todo._id] = 0;
-                });
-                setTimers(initialTimers);
-                setLoading(false);
+                // Convert all status values to frontend format
+                const formattedTodos = response.data.map(todo => ({
+                    ...todo,
+                    status: formatStatusForDisplay(todo.status)
+                }));
+                setTodos(formattedTodos);
             } catch (err) {
-                setError('Error fetching todos: ' + err.message);
+                setError('Failed to fetch todos');
+                console.error(err);
+            } finally {
                 setLoading(false);
             }
         };
@@ -53,14 +45,33 @@ const TodoCard = ({ refreshTrigger = 0 }) => {
         };
     }, [refreshTrigger]); // Add refreshTrigger to the dependency array
 
-    const handleStatusToggle = async (id, completed) => {
+    // Add a utility function at the top of your component to handle format conversion
+    const formatStatusForDisplay = (backendStatus) => {
+        // Convert backend format to frontend display format
+        if (backendStatus === 'in-progress') return 'inprogress';
+        return backendStatus;
+    };
+
+    const formatStatusForBackend = (displayStatus) => {
+        // Convert frontend format to backend format
+        if (displayStatus === 'inprogress') return 'in-progress';
+        return displayStatus;
+    };
+
+    // Replace handleStatusToggle with a function that cycles through all three states
+    const handleStatusToggle = async (id, currentStatus) => {
         try {
+            // Cycle through status values: pending -> inprogress -> completed -> pending
+            const nextStatus = 
+                currentStatus === 'pending' ? 'inprogress' :
+                currentStatus === 'inprogress' ? 'completed' : 'pending';
+                
             await axiosInstance.put(`/todos/${id}`, { 
-                completed: !completed
+                status: formatStatusForBackend(nextStatus)
             });
             
             setTodos(todos.map(todo => 
-                todo._id === id ? { ...todo, completed: !completed } : todo
+                todo._id === id ? { ...todo, status: nextStatus } : todo
             ));
         } catch (err) {
             setError('Error updating todo: ' + err.message);
@@ -85,14 +96,14 @@ const TodoCard = ({ refreshTrigger = 0 }) => {
         }
     };
     
-    // Start edit mode
+    // Start edit mode (modify to use status instead of completed)
     const handleEdit = (todo) => {
         setEditingId(todo._id);
         setEditForm({
             title: todo.title,
             description: todo.description,
             priority: todo.priority || 'medium',
-            completed: todo.completed
+            status: todo.status || 'pending'
         });
     };
     
@@ -105,7 +116,13 @@ const TodoCard = ({ refreshTrigger = 0 }) => {
     // Save edits
     const handleSaveEdit = async (id) => {
         try {
-            await axiosInstance.put(`/todos/${id}`, editForm);
+            // Format the status before sending to backend
+            const formattedEditForm = {
+                ...editForm,
+                status: formatStatusForBackend(editForm.status)
+            };
+            
+            await axiosInstance.put(`/todos/${id}`, formattedEditForm);
             
             // Update local state with edited todo
             setTodos(todos.map(todo => 
@@ -126,15 +143,6 @@ const TodoCard = ({ refreshTrigger = 0 }) => {
         setEditForm(prev => ({
             ...prev,
             [name]: value
-        }));
-    };
-
-    // Handle checkbox changes
-    const handleCheckboxChange = (e) => {
-        const { name, checked } = e.target;
-        setEditForm(prev => ({
-            ...prev,
-            [name]: checked
         }));
     };
     
@@ -245,19 +253,21 @@ const TodoCard = ({ refreshTrigger = 0 }) => {
                                     {/* Status - Styled like the original status pill */}
                                     <div className="bg-gray-200 rounded-full py-1 px-3 inline-block cursor-pointer shadow text-sm">
                                         <div className="flex items-center">
-                                            <label className="flex items-center cursor-pointer">
-                                                <input 
-                                                    type="checkbox" 
-                                                    name="completed" 
-                                                    checked={editForm.completed} 
-                                                    onChange={handleCheckboxChange}
-                                                    className="hidden"
-                                                />
-                                                <span className="text-green-700 font-mono">
-                                                    {editForm.completed ? "Completed" : "Pending"}
-                                                </span>
-                                                <span className="ml-1 text-xs">▼</span>
-                                            </label>
+                                            <select
+                                                name="status"
+                                                value={editForm.status}
+                                                onChange={handleInputChange}
+                                                className="bg-transparent border-0 text-sm font-mono focus:outline-none focus:ring-0 p-0 appearance-none"
+                                                style={{ 
+                                                    color: editForm.status === 'completed' ? 'green' : 
+                                                           editForm.status === 'inprogress' ? 'blue' : 'orange' 
+                                                }}
+                                            >
+                                                <option value="pending">Pending</option>
+                                                <option value="inprogress">In Progress</option>
+                                                <option value="completed">Completed</option>
+                                            </select>
+                                            <span className="ml-1 text-xs">▼</span>
                                         </div>
                                     </div>
                                 </div>
@@ -321,11 +331,15 @@ const TodoCard = ({ refreshTrigger = 0 }) => {
                                     
                                     <div 
                                         className="bg-gray-200 rounded-full py-1 px-3 inline-block cursor-pointer shadow text-sm"
-                                        onClick={() => handleStatusToggle(todo._id, todo.completed)}
+                                        onClick={() => handleStatusToggle(todo._id, todo.status)}
                                     >
                                         <div className="flex items-center">
-                                            <span className="text-green-700 font-mono">
-                                                {todo.completed ? "Completed" : "Pending"}
+                                            <span className={`font-mono ${
+                                                todo.status === 'completed' ? 'text-green-700' : 
+                                                todo.status === 'inprogress' ? 'text-blue-700' : 'text-orange-700'
+                                            }`}>
+                                                {todo.status === 'completed' ? 'Completed' : 
+                                                 todo.status === 'inprogress' ? 'In Progress' : 'Pending'}
                                             </span>
                                             <span className="ml-1 text-xs">▼</span>
                                         </div>

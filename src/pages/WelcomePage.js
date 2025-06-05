@@ -29,7 +29,12 @@ const WelcomePage = () => {
             // Fetch todos count
             const todosResponse = await axiosInstance.get('/todos');
             const todos = todosResponse.data;
-            const uncompleted = todos.filter(todo => !todo.completed).length;
+            
+            // Count todos that don't have 'completed' status
+            const uncompleted = todos.filter(todo => 
+                todo.status !== 'completed' 
+            ).length;
+            
             setUncompletedCount(uncompleted);
             setTotalCount(todos.length);
             setLoading(false);

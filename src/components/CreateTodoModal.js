@@ -31,7 +31,7 @@ const CreateTodoModal = ({ isOpen, onClose, onSuccess }) => {
             .oneOf(['low', 'medium', 'high'], 'Invalid priority level')
             .required('Priority is required'),
         status: Yup.string()
-            .oneOf(['pending', 'in progress', 'completed'], 'Invalid status')
+            .oneOf(['pending', 'inprogress', 'completed'], 'Invalid status')
             .required('Status is required')
     });
 
@@ -48,8 +48,16 @@ const CreateTodoModal = ({ isOpen, onClose, onSuccess }) => {
         setError(null);
 
         try {
+            // Format status to match what the backend expects
+            let formattedStatus = values.status;
+            if (values.status === 'inprogress') {
+                formattedStatus = 'in-progress';
+            }
+            
             await axiosInstance.post('/todos', {
                 ...values,
+                status: formattedStatus,
+                // Keep completed for backward compatibility if needed
                 completed: values.status === 'completed'
             });
             resetForm();
@@ -153,7 +161,7 @@ const CreateTodoModal = ({ isOpen, onClose, onSuccess }) => {
                                             className="w-full px-2 py-1.5 border border-gray-300 bg-white rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400 font-mono appearance-none text-sm"
                                         >
                                             <option value="pending">Pending</option>
-                                            <option value="in progress">In Progress</option>
+                                            <option value="inprogress">In Progress</option>
                                             <option value="completed">Completed</option>
                                         </Field>
                                         <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-gray-700">
